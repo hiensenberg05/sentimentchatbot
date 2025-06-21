@@ -47,16 +47,16 @@
 ```bash
 git clone https://github.com/theRKworks/saced.git
 cd saced
-2️⃣ Create a Virtual Environment
+Create a Virtual Environment
 python -m venv venv
 Activate the environment:
 On Windows:
 venv\Scripts\activate
 On Mac/Linux:
 source venv/bin/activate
-3️⃣ Install Dependencies
+ Install Dependencies
 pip install -r requirements.txt
-4️⃣ Set Up OpenAI API Key
+Set Up OpenAI API Key
 OPENAI_API_KEY=your_openai_api_key
-5️⃣ Run the Application
+ Run the Application
 streamlit run app.py
