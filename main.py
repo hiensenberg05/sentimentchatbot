@@ -17,7 +17,7 @@ nltk.download("vader_lexicon")
 sia = SentimentIntensityAnalyzer()
 
 # 🔹 Set OpenAI API Key (Use Environment Variable for Security)
-openai_api_key = "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"
+openai_api_key = "YOUR OPEN_API_KEY"
 openai.api_key = openai_api_key  # Set OpenAI API key
 
 # 🔹 Initialize GPT-4 Model
