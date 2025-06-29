@@ -1,62 +1,120 @@
-# 💬 SentimentChatbot  
-**Sentiment Analysis & Customer Engagement Dashboard (SACED)**  
+# 💬 Advanced Sentiment Analysis Dashboard
+
+A powerful and interactive dashboard built with **Streamlit**, leveraging **TextBlob**, **VADER**, and **OpenAI's GPT models via LangChain** for deep sentiment and aspect-based analysis of customer feedback. Ideal for analyzing product reviews or service feedback from CSV files.
 
 ---
 
-## 🚀 Project Overview  
+## 🚀 Features
 
-**SACED** is an AI-powered platform designed to enhance customer experience analysis. It performs **Aspect-Based Sentiment Analysis** on customer reviews and delivers valuable insights through an **interactive dashboard**. It also features an **AI chatbot assistant** to help interpret sentiment trends and identify **loyal customers** based on their feedback.
+- ✅ **Upload CSV**  
+  Robust support for multiple CSV formats and encodings, with automatic column detection (e.g., `comment`, `review`, `text`, etc.).
 
----
+- ✅ **Sentiment Analysis**  
+  - **TextBlob** for polarity and subjectivity.  
+  - **VADER** for compound sentiment scoring.  
+  - Categorization into **Positive**, **Negative**, and **Neutral** sentiments.
 
-## 🎯 Key Features  
+- ✅ **Visual Insights**  
+  - 📊 Sentiment distribution bar chart  
+  - 🔬 Polarity vs. subjectivity scatter plot  
+  - ☁️ Word clouds for positive, negative, and all reviews
 
-- ✅ **Aspect-Based Sentiment Analysis**  
-  Extracts fine-grained sentiments from customer reviews using **GPT-4**, identifying opinions on multiple aspects like service, delivery, product quality, etc.
+- ✅ **AI-Powered Analysis** *(OpenAI Key required)*  
+  - 🧠 Auto-generated summary of customer sentiment  
+  - 🔍 Aspect-based sentiment extraction (first 10 reviews)
 
-- ✅ **Chatbot Assistant**  
-  An integrated AI chatbot allows users to ask questions about sentiment trends, customer satisfaction, and engagement patterns.
-
-- ✅ **Real-Time Dashboard**  
-  Visualizes sentiment scores, aspect distributions, and customer satisfaction trends with interactive graphs.
-
-- ✅ **Loyal Customer Detection**  
-  Automatically highlights repeat customers and those who leave consistently positive feedback.
-
-- ✅ **CSV Upload and Export**  
-  Easily upload review data in CSV format and export the processed file with sentiment annotations.
-
----
-
-## 🛠️ Tech Stack  
-
-| Layer         | Technologies Used                    |
-|---------------|--------------------------------------|
-| **Frontend**  | Streamlit                            |
-| **Backend**   | Python (Flask or FastAPI)            |
-| **AI Models** | GPT-4 via OpenAI API, LangChain      |
-| **Data**      | Pandas                               |
-| **Charts**    | Plotly, Matplotlib                   |
+- ✅ **Conversational Chatbot** *(OpenAI Key required)*  
+  Ask your data questions in natural language and get real-time insights powered by LangChain's conversational memory.
 
 ---
 
-## 📦 Installation Guide  
+## 📦 File Structure
 
-### 1️⃣ Clone the Repository  
+```
+├── app.py                # Main Streamlit application (UI)
+├── main.py               # Data processing, sentiment logic, OpenAI integration
+├── requirements.txt      # Python dependencies
+├── env_template.txt      # Template for .env (OpenAI API key)
+├── .gitignore            # Excludes data, env files, and cache
+└── README.md             # Project documentation
+```
+
+---
+
+## 🛠️ Getting Started
+
+### 1. 📥 Clone the Repository
 
 ```bash
-git clone https://github.com/theRKworks/saced.git
-cd saced
-Create a Virtual Environment
+git clone https://github.com/hiensenberg05/sentimentchatbot.git
+cd sentimentchatbot
+```
+
+### 2. 🧪 Create & Activate Virtual Environment
+
+```bash
 python -m venv venv
-Activate the environment:
-On Windows:
+
+# On Windows
 venv\Scripts\activate
-On Mac/Linux:
+
+# On Unix or Mac
 source venv/bin/activate
- Install Dependencies
+```
+
+### 3. 📦 Install Requirements
+
+```bash
 pip install -r requirements.txt
-Set Up OpenAI API Key
-OPENAI_API_KEY=your_openai_api_key
- Run the Application
+```
+
+### 4. 🔐 Set Up OpenAI API Key
+
+Create a `.env` file in the root directory:
+
+```
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+Or use the Streamlit sidebar to input your key dynamically.
+
+### 5. 🚀 Run the App
+
+```bash
 streamlit run app.py
+```
+
+---
+
+## 🧠 How It Works
+
+1. **Upload a CSV** → App identifies the most relevant text column.
+2. **NLP Analysis** → Runs TextBlob and VADER-based sentiment metrics.
+3. **Visualizations** → Generates charts and word clouds.
+4. **AI Summary** → OpenAI generates a concise, structured analysis.
+5. **Chatbot** → LangChain-based assistant lets you query the data.
+
+---
+
+## 📂 Supported Dataset Format
+
+Your CSV file must contain at least one column with customer feedback text. Supported column names include:
+
+```
+comment, review, text, feedback, content, review_text, body
+```
+
+---
+
+## ⚠️ Notes
+
+- Large datasets may take time to process with AI features enabled.
+- `.env`, datasets, and `__pycache__` folders are ignored via `.gitignore`.
+
+---
+
+## 📄 License
+
+MIT License. Feel free to use, modify, and share.
+
+---
