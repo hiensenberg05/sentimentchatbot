@@ -1,0 +1,7 @@
+# Ignore datasets and sensitive files
+*.csv
+.env
+__pycache__/
+*.pyc
+# VSCode settings
+.vscode/
