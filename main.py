@@ -11,6 +11,10 @@ from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferWindowMemory
+import streamlit as st
+from functools import lru_cache
+import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -114,67 +118,99 @@ def load_and_prepare_data(uploaded_file):
 
 # --- Sentiment Analysis ---
 
+@st.cache_data
 def analyze_sentiment(df):
-    """Performs sentiment analysis using TextBlob and VADER."""
-    analyzer = SentimentIntensityAnalyzer()
+    """Analyzes sentiment using both TextBlob and VADER for comprehensive results."""
+    # Create a copy to avoid modifying the original dataframe
+    df_analyzed = df.copy()
     
-    # TextBlob Analysis
-    df['polarity'] = df['comment'].apply(lambda x: TextBlob(x).sentiment.polarity)
-    df['subjectivity'] = df['comment'].apply(lambda x: TextBlob(x).sentiment.subjectivity)
-
-    # VADER Analysis
-    df['vader_sentiment'] = df['comment'].apply(lambda x: analyzer.polarity_scores(x)['compound'])
-
-    # Categorize sentiment based on a combination or a primary method (e.g., TextBlob polarity)
+    # Initialize VADER sentiment analyzer
+    vader_analyzer = SentimentIntensityAnalyzer()
+    
+    # Function to categorize sentiment based on polarity
     def categorize_sentiment(polarity):
-        if polarity > 0.05:
+        if polarity > 0.1:
             return 'Positive'
-        elif polarity < -0.05:
+        elif polarity < -0.1:
             return 'Negative'
         else:
             return 'Neutral'
-
-    df['sentiment_category'] = df['polarity'].apply(categorize_sentiment)
-    return df
+    
+    # Apply sentiment analysis
+    sentiments = []
+    polarities = []
+    subjectivities = []
+    vader_scores = []
+    
+    for text in df_analyzed['comment']:
+        if pd.isna(text) or str(text).strip() == '':
+            sentiments.append('Neutral')
+            polarities.append(0.0)
+            subjectivities.append(0.0)
+            vader_scores.append(0.0)
+            continue
+            
+        # TextBlob analysis
+        blob = TextBlob(str(text))
+        polarity = blob.sentiment.polarity
+        subjectivity = blob.sentiment.subjectivity
+        
+        # VADER analysis
+        vader_scores_dict = vader_analyzer.polarity_scores(str(text))
+        vader_score = vader_scores_dict['compound']
+        
+        # Combine both approaches (weighted average)
+        combined_polarity = (polarity + vader_score) / 2
+        
+        sentiments.append(categorize_sentiment(combined_polarity))
+        polarities.append(combined_polarity)
+        subjectivities.append(subjectivity)
+        vader_scores.append(vader_score)
+    
+    # Add results to dataframe
+    df_analyzed['sentiment_category'] = sentiments
+    df_analyzed['polarity'] = polarities
+    df_analyzed['subjectivity'] = subjectivities
+    df_analyzed['vader_score'] = vader_scores
+    
+    return df_analyzed
 
 
 # --- Visualization Generation ---
 
+@st.cache_data
 def create_sentiment_distribution_plot(df):
-    """Creates a bar chart of sentiment distribution."""
-    sentiment_counts = df['sentiment_category'].value_counts().reset_index()
-    sentiment_counts.columns = ['Sentiment', 'Count']
-    fig = px.bar(sentiment_counts, x='Sentiment', y='Count', color='Sentiment', title='Sentiment Distribution',
-                 color_discrete_map={'Positive': 'green', 'Negative': 'red', 'Neutral': 'grey'})
+    """Creates a pie chart showing the distribution of sentiments."""
+    sentiment_counts = df['sentiment_category'].value_counts()
+    fig = px.pie(values=sentiment_counts.values, names=sentiment_counts.index, 
+                 title="Sentiment Distribution")
     return fig
 
+@st.cache_data
 def create_polarity_vs_subjectivity_scatter(df):
-    """Creates a scatter plot of polarity vs. subjectivity."""
-    fig = px.scatter(
-        df, x='polarity', y='subjectivity', 
-        color='sentiment_category', 
-        title='Sentiment Polarity vs. Subjectivity',
-        hover_data={'comment': True, 'polarity': ':.2f', 'subjectivity': ':.2f'},
-        color_discrete_map={'Positive': 'green', 'Negative': 'red', 'Neutral': 'grey'}
-    )
+    """Creates a scatter plot of polarity vs subjectivity."""
+    fig = px.scatter(df, x='polarity', y='subjectivity', color='sentiment_category',
+                     title="Polarity vs Subjectivity Scatter Plot")
     return fig
 
+@st.cache_data
 def generate_wordcloud_figure(df, sentiment_category):
-    """Generates a word cloud for a specific sentiment category and returns a Plotly figure."""
+    """Generates a wordcloud figure for the specified sentiment category."""
     if sentiment_category == 'All':
-        text_data = df['comment']
+        text_data = ' '.join(df['comment'].astype(str))
     else:
-        text_data = df[df['sentiment_category'] == sentiment_category]['comment']
-
-    text = ' '.join(text_data.dropna())
-    if not text:
-        return None
-        
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+        text_data = ' '.join(df[df['sentiment_category'] == sentiment_category]['comment'].astype(str))
     
-    fig = px.imshow(wordcloud, title=f'{sentiment_category} Reviews Word Cloud')
-    fig.update_xaxes(showticklabels=False)
-    fig.update_yaxes(showticklabels=False)
+    if not text_data.strip():
+        return None
+    
+    # Create wordcloud
+    wordcloud = WordCloud(width=400, height=300, background_color='white', 
+                         max_words=100, colormap='viridis').generate(text_data)
+    
+    # Convert to plotly figure
+    fig = px.imshow(wordcloud, title=f"Word Cloud - {sentiment_category} Reviews")
+    fig.update_layout(showlegend=False)
     return fig
 
 
@@ -240,54 +276,79 @@ def get_aspect_analysis(df, api_key):
     return df
 
 def initialize_chatbot(api_key, df):
-    """Initializes the LangChain chatbot for interactive data analysis."""
+    """Initializes the LangChain chatbot for interactive data analysis with full dataset context."""
     if not api_key:
         return None
 
-    llm = OpenAI(temperature=0.5, openai_api_key=api_key)
-    
-    # Create a string representation of the dataframe sample to inject into the prompt
-    data_context = df.head(100).to_string()
+    llm = OpenAI(temperature=0.3, openai_api_key=api_key, max_tokens=500)
 
-    memory = ConversationBufferMemory(memory_key="chat_history")
-    
+    # Build a rich summary of the FULL dataset
+    n_rows = len(df)
+    n_cols = len(df.columns)
+    col_names = ', '.join(df.columns)
+    positive_count = len(df[df['sentiment_category'] == 'Positive'])
+    negative_count = len(df[df['sentiment_category'] == 'Negative'])
+    neutral_count = len(df[df['sentiment_category'] == 'Neutral'])
+    avg_polarity = df['polarity'].mean()
+    avg_subjectivity = df['subjectivity'].mean()
+    sample_rows = df[['comment', 'sentiment_category', 'polarity']].head(5).to_string(index=False)
+
+    data_summary = f"""
+Dataset shape: {n_rows} rows × {n_cols} columns
+Columns: {col_names}
+
+Sentiment distribution:
+- Positive: {positive_count}
+- Negative: {negative_count}
+- Neutral: {neutral_count}
+
+Average polarity: {avg_polarity:.2f}
+Average subjectivity: {avg_subjectivity:.2f}
+
+Sample reviews (first 5):
+{sample_rows}
+"""
+
     prompt_template = PromptTemplate(
-        input_variables=["chat_history", "question", "data_context"],
-        template=f"""You are an AI assistant helping a user analyze customer feedback. You have access to the first 100 rows of their data.
-        Answer the user's questions based on the data provided.
+        input_variables=["chat_history", "question"],
+        template=f"""You are a helpful AI assistant analyzing customer feedback data. Use the provided dataset summary to answer questions. If you don't know, say so.
 
-        Data Context:
-        {{data_context}}
+DATA SUMMARY:
+{data_summary}
 
-        Conversation History:
-        {{chat_history}}
+Chat History:
+{{chat_history}}
 
-        User's Question: {{question}}
+Question: {{question}}
 
-        Your Answer:"""
+Answer:"""
     )
 
+    memory = ConversationBufferWindowMemory(k=5, memory_key="chat_history", return_messages=True)
     chatbot_chain = LLMChain(
         llm=llm,
         prompt=prompt_template,
         memory=memory,
         verbose=False
     )
-    # We pass the context during the call, not here
-    return chatbot_chain, data_context
+    return chatbot_chain, data_summary
 
 
 # --- Main Processing Function ---
 
+@st.cache_data
 def process_uploaded_file(uploaded_file, run_ai_analysis=False, api_key=None):
-    """A single function to run the entire data processing pipeline."""
+    """A single function to run the entire data processing pipeline with caching for performance."""
     df = load_and_prepare_data(uploaded_file)
-    df_analyzed = analyze_sentiment(df)
-    
+    df_analyzed = analyze_sentiment(df)  # FULL dataset always
+
+    ai_summary = None
     if run_ai_analysis and api_key:
-        df_analyzed = get_aspect_analysis(df_analyzed, api_key)
-        ai_summary = get_ai_summary(df_analyzed, api_key)
-        return df_analyzed, ai_summary
-    
-    return df_analyzed, None
+        # Only run AI aspect analysis and summary on a sample for performance
+        sample_size = min(len(df_analyzed), 50)
+        df_sample = df_analyzed.head(sample_size)
+        # Optionally, you can run get_aspect_analysis on df_sample and merge results if needed
+        ai_summary = get_ai_summary(df_sample, api_key)
+
+    return df_analyzed, ai_summary
 

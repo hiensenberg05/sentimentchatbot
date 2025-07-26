@@ -32,6 +32,16 @@ def main():
         st.header("Dashboard Controls")
         uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
         
+        # Show warning for large files
+        if uploaded_file is not None:
+            file_size = uploaded_file.size / (1024 * 1024)  # Size in MB
+            if file_size > 1:  # Warning for files larger than 1MB
+                st.warning(f"⚠️ Large file detected ({file_size:.1f}MB). This may cause rate limit issues with AI features. Consider using a smaller sample for better performance.")
+            
+            # Add option to limit data size for better performance
+            if file_size > 5:  # For very large files
+                st.info("💡 **Performance Tip:** Large files may be slow. The app will automatically sample data for AI features.")
+        
         st.header("Analysis Options")
         show_wordclouds = st.checkbox("Generate Word Clouds", value=True)
         show_detailed_plots = st.checkbox("Show Detailed Analysis Plots", value=True)
@@ -149,32 +159,86 @@ def main():
                 with tabs[-1]: # Chatbot is always the last tab
                     st.subheader("Chat with Your Data")
                     
-                    # Initialize chat history
+                    # Add a clear chat button
+                    col1, col2 = st.columns([3, 1])
+                    with col2:
+                        if st.button("🗑️ Clear Chat", help="Clear conversation history"):
+                            st.session_state.messages = []
+                            st.session_state.chatbot_chain.memory.clear()
+                            st.rerun()
+                    
+                    # Initialize chat history with better structure
                     if "messages" not in st.session_state:
                         st.session_state.messages = []
+                        # Add initial system message
+                        st.session_state.messages.append({
+                            "role": "assistant", 
+                            "content": "👋 Hi! I'm your AI assistant. I can help you analyze your sentiment data. Ask me anything about the reviews, sentiment distribution, or specific patterns you've noticed!"
+                        })
 
-                    # Display chat messages from history on app rerun
+                    # Display chat messages from history with better formatting
                     for message in st.session_state.messages:
                         with st.chat_message(message["role"]):
-                            st.markdown(message["content"])
+                            if message["role"] == "assistant" and message["content"].startswith("👋"):
+                                st.markdown(message["content"])
+                            else:
+                                st.markdown(message["content"])
 
-                    # Accept user input
-                    if prompt := st.chat_input("Ask a question about your data..."):
+                    # Accept user input with better UX
+                    if prompt := st.chat_input("Ask a question about your data...", key="chat_input"):
                         # Add user message to chat history
                         st.session_state.messages.append({"role": "user", "content": prompt})
-                        # Display user message in chat message container
+                        
+                        # Display user message immediately
                         with st.chat_message("user"):
                             st.markdown(prompt)
 
-                        # Get assistant response
-                        with st.spinner("Thinking..."):
-                            response = st.session_state.chatbot_chain.run(
-                                question=prompt, 
-                                data_context=st.session_state.data_context
-                            )
-                            with st.chat_message("assistant"):
-                                st.markdown(response)
-                            st.session_state.messages.append({"role": "assistant", "content": response})
+                        # Get assistant response with optimized performance
+                        with st.chat_message("assistant"):
+                            with st.spinner("🤔 Analyzing..."):
+                                try:
+                                    # Use a more efficient call with timeout
+                                    response = st.session_state.chatbot_chain.run(
+                                        question=prompt
+                                    )
+                                    
+                                    # Clean up response if needed
+                                    if response and len(response.strip()) > 0:
+                                        st.markdown(response)
+                                        st.session_state.messages.append({"role": "assistant", "content": response})
+                                    else:
+                                        error_response = "I couldn't generate a response. Please try asking a different question."
+                                        st.markdown(error_response)
+                                        st.session_state.messages.append({"role": "assistant", "content": error_response})
+                                        
+                                except Exception as e:
+                                    error_msg = str(e)
+                                    if "rate_limit" in error_msg.lower() or "429" in error_msg:
+                                        response = "⚠️ **Rate limit exceeded!** Please wait 30 seconds and try again, or ask a shorter question."
+                                    elif "tokens" in error_msg.lower():
+                                        response = "⚠️ **Input too large!** Try asking a more specific question about your data."
+                                    elif "timeout" in error_msg.lower():
+                                        response = "⏱️ **Request timed out!** The response took too long. Try a simpler question."
+                                    else:
+                                        response = f"❌ **Error:** {error_msg[:100]}..." if len(error_msg) > 100 else f"❌ **Error:** {error_msg}"
+                                    
+                                    st.markdown(response)
+                                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    
+                    # Add helpful suggestions
+                    if len(st.session_state.messages) <= 2:  # Only show if chat is new
+                        st.markdown("---")
+                        st.markdown("**💡 Try asking:**")
+                        suggestions = [
+                            "What's the overall sentiment distribution?",
+                            "What are the most common positive themes?",
+                            "Show me some negative feedback examples",
+                            "What's the average sentiment score?"
+                        ]
+                        for suggestion in suggestions:
+                            if st.button(suggestion, key=f"suggest_{suggestion[:20]}"):
+                                st.session_state.messages.append({"role": "user", "content": suggestion})
+                                st.rerun()
 
         except Exception as e:
             st.error(f"An error occurred during processing: {e}")

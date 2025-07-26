@@ -3,5 +3,19 @@
 .env
 __pycache__/
 *.pyc
+
+# Virtual environments
+venv/
+myenv/
+
 # VSCode settings
 .vscode/
+
+# IDE files
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
